@@ -37,6 +37,3 @@ To run the program, follow these steps:
    python main.py
    ```
 
-## Program Functionality
-
-The program initializes sensor positions around a target and simulates the EKF process for a specified number of iterations. It includes a GUI with sliders to adjust the number of sensors, process noise (Q), sensor radius, and height. The results are visualized in a 3D scatter plot and an MSE (Mean Squared Error) plot.
