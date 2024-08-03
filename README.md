@@ -6,9 +6,6 @@ This is a paper implementation: [Optimal sensor deployment for 3D AOA target loc
 
 ## Prerequisites
 
-To run this project, you need to have Python and several libraries installed. Below are the steps to set up the environment.
-
-### 2. Install Required Libraries
 
 Use `pip` to install the required libraries. Open a terminal or command prompt and run the following command:
 
