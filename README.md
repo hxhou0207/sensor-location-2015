@@ -23,7 +23,7 @@ To run the program, follow these steps:
 
 2. **Navigate to the Project Directory**
 
-   Change the directory to where `main.py` is located. 
+   Change the directory to where `sensor_location_2015.py` is located. 
 
    ```sh
    cd path/to/your/project/directory
@@ -34,6 +34,6 @@ To run the program, follow these steps:
    Execute the script using Python:
 
    ```sh
-   python main.py
+   python sensor_location_2015.py
    ```
 
