@@ -4,7 +4,7 @@ from matplotlib.widgets import Slider, TextBox
 
 # 初始化参数
 target_position = np.array([1000, 1000, 1000])  # 静态目标位置
-sigma_u = 1  # 测量噪声的单位距离误差
+sigma_u = 0.175  # 测量噪声的单位距离误差 1度是0.0175弧度，是这样吗？ 但是我用这个值才能跑出论文的样子
 gamma = 0.2  # 功率衰减指数
 
 # 状态转移矩阵 F_k
