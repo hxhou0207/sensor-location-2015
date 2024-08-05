@@ -4,7 +4,7 @@ from matplotlib.widgets import Slider, TextBox
 
 # 初始化参数
 target_position = np.array([1000, 1000, 1000])  # 静态目标位置
-sigma_u = 0.0175  # 测量噪声的单位距离误差 1度是0.0175弧度，是这样吗？ 但是我用这个值才能跑出论文的样子
+sigma_u = 0.0175  # 测量噪声的单位距离误差
 gamma = 0.2  # 功率衰减指数
 
 # 状态转移矩阵 F_k
@@ -56,14 +56,18 @@ def H_jacobian(X, sensor_position):
     H[1, 5] = 0
 
     return H
+
+
 # 这个H应该是没啥问题
 
-# 论文里没说Q的事..设置成0？
+
+# 预测步骤
 def predict(X, P, F, Q):
     X = F @ X
     P = F @ P @ F.T + Q
     return X, P
 
+# 更新步骤
 def update(X, P, z_noisy, H, R, sensor_position):
     y = z_noisy - h(X, sensor_position)     # z_n是带噪声的测量值
     S = H @ P @ H.T + R
@@ -80,15 +84,16 @@ def measurement(X, sensor_position, R):
     noisy_measurement = true_measurement + noise    # 加了噪音，所以不同传感器测出的仰角不同，正常。
     return noisy_measurement
 
-
-def simulate_ekf(N, Q_val, iterations, radius, height):
+def simulate_ekf(N, Q_val, iterations, radius, elevation_angles):
     # 初始化传感器位置
     sensor_positions = np.zeros((N, 3))  # N 是行，传感器个数
-    for k in range(N):  # 分配每个传感器的位置, 由于是仿真，直接由target真实位置得到sensor的位置，确保target在中轴线上
-        theta_k = 2 * np.pi * k / N
-        sensor_positions[k, 0] = target_position[0] + radius * np.cos(theta_k)  # sensor's x
-        sensor_positions[k, 1] = target_position[1] + radius * np.sin(theta_k)  # sensor's y
-        sensor_positions[k, 2] = height  # sensor's z
+    for i, angle in enumerate(elevation_angles):
+        idx = np.arange(i * (N // len(elevation_angles)), (i + 1) * (N // len(elevation_angles)))
+        theta = np.linspace(0, 2 * np.pi, len(idx))
+        for j, k in enumerate(idx):
+            sensor_positions[k, 0] = target_position[0] + radius * np.cos(theta[j]) * np.cos(np.radians(angle))
+            sensor_positions[k, 1] = target_position[1] + radius * np.sin(theta[j]) * np.cos(np.radians(angle))
+            sensor_positions[k, 2] = target_position[2] - radius * np.sin(np.radians(angle))
 
     # 初始化状态向量和协方差矩阵
     X = np.array([1200, 0, 800, 0, 1400, 0])  # 初始状态
@@ -133,7 +138,6 @@ def simulate_ekf(N, Q_val, iterations, radius, height):
         mse = np.trace(P)
         mse_list.append(mse)
 
-    print(f"MSE after {iterations} iterations: {mse_list[-1]}")
     return sensor_positions, mse_list, sensor1_az_el, sensor50_az_el, sensor1_position, sensor50_position
 
 # 创建图形和滑块
@@ -145,12 +149,10 @@ plt.subplots_adjust(left=0.25, bottom=0.35)
 ax_sensors = plt.axes([0.1, 0.25, 0.65, 0.03], facecolor='lightgoldenrodyellow')
 ax_Q = plt.axes([0.1, 0.20, 0.65, 0.03], facecolor='lightgoldenrodyellow')
 ax_radius = plt.axes([0.1, 0.15, 0.65, 0.03], facecolor='lightgoldenrodyellow')
-ax_height = plt.axes([0.1, 0.10, 0.65, 0.03], facecolor='lightgoldenrodyellow')
 
 sensors_slider = Slider(ax_sensors, 'Sensors', 10, 200, valinit=100, valstep=1)
-Q_slider = Slider(ax_Q, 'Process Noise (Q)', 0, 1.0, valinit=0.04, valstep=0.1)  # 论文没说Q的事，先设成0
-radius_slider = Slider(ax_radius, 'Radius', 4, 2000, valinit=591.80, valstep=1)
-height_slider = Slider(ax_height, 'Height', 0, 2000, valinit=462.38, valstep=1)
+Q_slider = Slider(ax_Q, 'Process Noise (Q)', 0, 1.0, valinit=0, valstep=0.1)  # 论文没说Q的事，先设成0
+radius_slider = Slider(ax_radius, 'Radius', 4, 2000, valinit=800, valstep=1)
 
 # 调整显示传感器方位角和仰角的位置和大小
 ax_sensor1_az_el = plt.axes([0.75, 0.95, 0.2, 0.03], facecolor='lightgoldenrodyellow')
@@ -161,25 +163,29 @@ sensor50_az_el_text = TextBox(ax_sensor50_az_el, 'Sensor 50 (az, el)', initial="
 
 sensor_history = []
 mse_history = []
+elevation_angle_sets = [
+    [0], [15], [30], [40], [42.29], [45], [60], [75]
+]
 
 def update_sliders(val):
     N = int(sensors_slider.val)
     Q_val = Q_slider.val
     radius = radius_slider.val
-    height = height_slider.val
 
-    sensor_positions, mse_list, sensor1_az_el, sensor50_az_el, sensor1_position, sensor50_position = simulate_ekf(N, Q_val, 100, radius, height)
-
-    sensor_history.append(sensor_positions)
-    mse_history.append(mse_list)
+    sensor_history.clear()
+    mse_history.clear()
+    colors = plt.cm.viridis(np.linspace(0, 1, len(elevation_angle_sets)))
 
     ax_3d.clear()
     ax_mse.clear()
 
-    # 显示所有历史传感器位置
-    colors = plt.cm.viridis(np.linspace(0, 1, len(sensor_history)))
-    for i, sensors in enumerate(sensor_history):
-        ax_3d.scatter(sensors[:, 0], sensors[:, 1], sensors[:, 2], color=colors[i], label=f'State {i + 1}', alpha=0.6)
+    for idx, angles in enumerate(elevation_angle_sets):
+        sensor_positions, mse_list, sensor1_az_el, sensor50_az_el, sensor1_position, sensor50_position = simulate_ekf(N, Q_val, 100, radius, angles)
+
+        sensor_history.append(sensor_positions)
+        mse_history.append(mse_list)
+
+        ax_3d.scatter(sensor_positions[:, 0], sensor_positions[:, 1], sensor_positions[:, 2], color=colors[idx], label=f'Angle {angles[0]} degrees', alpha=0.6)
 
     # 用五角星表示 target 和两个 sensor
     ax_3d.scatter(target_position[0], target_position[1], target_position[2], marker='*', label='True Target Position', color='green', s=200)
@@ -197,7 +203,8 @@ def update_sliders(val):
 
     for i, mse_list in enumerate(mse_history):
         if any(mse_list):  # 仅绘制非零的 MSE
-            ax_mse.plot(range(1, 101), mse_list, color=colors[i], label=f'State {i + 1} MSE')
+            ax_mse.plot(range(1, 101), mse_list, color=colors[i], label=f'Angle {elevation_angle_sets[i][0]} MSE')
+            ax_mse.text(100, mse_list[-1], f"{mse_list[-1]:.2f}", color=colors[i], fontsize=12)
 
     # 动态设置 y 轴范围并应用对数刻度
     all_mse = np.concatenate(mse_history)
@@ -219,16 +226,11 @@ def update_sliders(val):
     else:
         sensor50_az_el_text.set_val("N/A")
 
-    # 显示 MSE 的起始值和最终值
-    ax_mse.text(0, mse_list[0], f"{mse_list[0]:.2f}", color='red', fontsize=12)
-    ax_mse.text(99, mse_list[-1], f"{mse_list[-1]:.2f}", color='red', fontsize=12)
-
     fig.canvas.draw_idle()
 
 sensors_slider.on_changed(update_sliders)
 Q_slider.on_changed(update_sliders)
 radius_slider.on_changed(update_sliders)
-height_slider.on_changed(update_sliders)
 
 # 初始化显示
 update_sliders(None)

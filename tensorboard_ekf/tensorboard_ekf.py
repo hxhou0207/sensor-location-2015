@@ -6,7 +6,7 @@ import io
 
 # 初始化参数
 target_position = np.array([1000, 1000, 1000], dtype=np.float64)  # 静态目标位置
-sigma_u = np.float64(1)  # 测量噪声的单位距离误差
+sigma_u = np.float64(0.0175)  # 测量噪声的单位距离误差
 gamma = np.float64(0.2)  # 功率衰减指数
 
 # 定义日志目录
@@ -43,14 +43,23 @@ def H_jacobian(X, sensor_position):
     d_xyz = d_xy + delta_z ** 2
     sqrt_d_xy = np.sqrt(d_xy)
 
-    H = np.zeros((2, 6), dtype=np.float64)
-    if d_xy != 0:
-        H[0, 0] = -delta_y / d_xy
-        H[0, 2] = delta_x / d_xy
-    if d_xyz != 0 and sqrt_d_xy != 0:
-        H[1, 0] = -delta_x * delta_z / (d_xyz * sqrt_d_xy)
-        H[1, 2] = -delta_y * delta_z / (d_xyz * sqrt_d_xy)
-        H[1, 4] = sqrt_d_xy / d_xyz
+    H = np.zeros((2, 6))
+
+    # 对方位角（azimuth）的偏导数
+    H[0, 0] = -delta_y / d_xy
+    H[0, 1] = 0
+    H[0, 2] = delta_x / d_xy
+    H[0, 3] = 0
+    H[0, 4] = 0
+    H[0, 5] = 0
+
+    # 对仰角（elevation）的偏导数
+    H[1, 0] = -delta_x * delta_z / (d_xyz * sqrt_d_xy)
+    H[1, 1] = 0
+    H[1, 2] = -delta_y * delta_z / (d_xyz * sqrt_d_xy)
+    H[1, 3] = 0
+    H[1, 4] = sqrt_d_xy / d_xyz
+    H[1, 5] = 0
 
     return H
 
@@ -167,7 +176,7 @@ def update_sliders(val):
     radius = radius_slider.val
     height = height_slider.val
 
-    sensor_positions, mse_list, sensor1_az_el, sensor50_az_el, sensor1_position, sensor50_position = simulate_ekf(N, Q_val, 1000, radius, height)
+    sensor_positions, mse_list, sensor1_az_el, sensor50_az_el, sensor1_position, sensor50_position = simulate_ekf(N, Q_val, 100, radius, height)
 
     sensor_history.append(sensor_positions)
     mse_history.append(mse_list)
